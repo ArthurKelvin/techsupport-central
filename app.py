@@ -33,6 +33,19 @@ class Ticket(db.Model):
     technician_notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    
+    # --- Homepage Route ---
+@app.route('/')
+def index():
+    # Redirect users from the homepage to the new ticket form
+    return redirect(url_for('new_ticket_route')) 
+
+# --- Make sure your new ticket route has a function name ---
+@app.route('/new')
+def new_ticket_route(): # give it a name like this
+    return render_template('new_ticket.html')
+
+# ... your other routes
 
 # --- Your Flask Routes (@app.route(...)) will go here ---
 # You will need to change your database logic from raw SQL
