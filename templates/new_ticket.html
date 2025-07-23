@@ -9,6 +9,24 @@
     <!-- Google Fonts - Poppins for a modern, clean look -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        .banner {
+    position: fixed; /* Sticks to the top */
+    top: -100px; /* Start off-screen */
+    left: 0;
+    right: 0;
+    background-color: #28a745; /* Success Green */
+    color: white;
+    text-align: center;
+    padding: 16px;
+    font-weight: bold;
+    font-size: 18px;
+    transition: top 0.5s ease-in-out; /* The animation */
+    z-index: 1000;
+}
+
+.banner.show {
+    top: 0; /* Slide it into view */
+}
         /* Apply Poppins font to the entire body */
         body {
             font-family: 'Poppins', sans-serif;
@@ -28,7 +46,76 @@
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
+<body>
+    <div id="success-banner" class="banner">
+        ✅ Success! Your ticket has been submitted.
+    </div>
 
+    <form id="ticket-form">
+        <button type="submit" id="submit-btn">Submit Ticket</button>
+    </form>
+
+    <script>
+        // Get references to the HTML elements
+const ticketForm = document.getElementById('ticket-form');
+const submitBtn = document.getElementById('submit-btn');
+const successBanner = document.getElementById('success-banner');
+
+// Listen for when the user tries to submit the form
+ticketForm.addEventListener('submit', function(event) {
+    // Prevent the default browser action (page reload)
+    event.preventDefault();
+
+    // --- FIX THE SUBMIT BUTTON ---
+    // 1. Disable the button to prevent double-clicks
+    submitBtn.disabled = true;
+    // 2. Change the text to show it's working
+    submitBtn.textContent = 'Submitting...';
+
+    // --- SUBMIT DATA IN THE BACKGROUND ---
+    const formData = new FormData(ticketForm);
+    const data = Object.fromEntries(formData.entries());
+
+    fetch('/submit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.status === 'success') {
+            // --- SHOW THE ANIMATION ---
+            successBanner.classList.add('show');
+
+            // Hide the banner after a few seconds
+            setTimeout(() => {
+                successBanner.classList.remove('show');
+            }, 5000); // 5 seconds
+
+            // Reset the form and button
+            ticketForm.reset();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Another Ticket';
+        } else {
+            // Handle server-side errors
+            alert('An error occurred. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Ticket';
+        }
+    })
+    .catch(error => {
+        // Handle network errors
+        console.error('Error:', error);
+        alert('Could not connect to the server. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Ticket';
+    });
+});
+        // JavaScript code goes here
+    </script>
+</body>
     <!-- Main Container for the Form -->
     <div class="w-full max-w-2xl bg-white p-8 md:p-10 rounded-3xl custom-shadow transform transition-all duration-300 hover:scale-[1.01] border border-gray-200">
         <!-- Header Section -->
