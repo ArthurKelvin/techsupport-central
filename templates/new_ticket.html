@@ -9,24 +9,6 @@
     <!-- Google Fonts - Poppins for a modern, clean look -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        .banner {
-    position: fixed; /* Sticks to the top */
-    top: -100px; /* Start off-screen */
-    left: 0;
-    right: 0;
-    background-color: #28a745; /* Success Green */
-    color: white;
-    text-align: center;
-    padding: 16px;
-    font-weight: bold;
-    font-size: 18px;
-    transition: top 0.5s ease-in-out; /* The animation */
-    z-index: 1000;
-}
-
-.banner.show {
-    top: 0; /* Slide it into view */
-}
         /* Apply Poppins font to the entire body */
         body {
             font-family: 'Poppins', sans-serif;
@@ -43,79 +25,67 @@
         .custom-shadow {
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
+
+        /* Animation for success message */
+        @keyframes slideInFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-slide-in-fade-in {
+            animation: slideInFadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+        .animate-fade-out {
+            animation: fadeOut 0.5s ease-out forwards;
+        }
+
+        /* Loading spinner animation */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
-<body>
-    <div id="success-banner" class="banner">
-        ✅ Success! Your ticket has been submitted.
+
+    <!-- Flash Messages and Animation Container -->
+    <div id="flash-message-container" class="w-full max-w-2xl mx-auto mb-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div id="flash-message-{{ loop.index }}"
+                         class="p-4 rounded-lg text-lg font-semibold flex items-center justify-between animate-slide-in-fade-in
+                                {% if category == 'success' %}bg-green-500 text-white shadow-lg{% else %}bg-red-500 text-white shadow-lg{% endif %}">
+                        <span>
+                            {% if category == 'success' %}✨ Success!{% else %}⚠️ Error!{% endif %} {{ message }}
+                        </span>
+                        <button onclick="this.closest('.p-4').classList.add('animate-fade-out'); setTimeout(() => this.closest('.p-4').remove(), 500);"
+                                class="ml-4 text-white hover:text-gray-100 focus:outline-none">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
     </div>
 
-    <form id="ticket-form">
-        <button type="submit" id="submit-btn">Submit Ticket</button>
-    </form>
-
-    <script>
-        // Get references to the HTML elements
-const ticketForm = document.getElementById('ticket-form');
-const submitBtn = document.getElementById('submit-btn');
-const successBanner = document.getElementById('success-banner');
-
-// Listen for when the user tries to submit the form
-ticketForm.addEventListener('submit', function(event) {
-    // Prevent the default browser action (page reload)
-    event.preventDefault();
-
-    // --- FIX THE SUBMIT BUTTON ---
-    // 1. Disable the button to prevent double-clicks
-    submitBtn.disabled = true;
-    // 2. Change the text to show it's working
-    submitBtn.textContent = 'Submitting...';
-
-    // --- SUBMIT DATA IN THE BACKGROUND ---
-    const formData = new FormData(ticketForm);
-    const data = Object.fromEntries(formData.entries());
-
-    fetch('/submit', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.status === 'success') {
-            // --- SHOW THE ANIMATION ---
-            successBanner.classList.add('show');
-
-            // Hide the banner after a few seconds
-            setTimeout(() => {
-                successBanner.classList.remove('show');
-            }, 5000); // 5 seconds
-
-            // Reset the form and button
-            ticketForm.reset();
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Another Ticket';
-        } else {
-            // Handle server-side errors
-            alert('An error occurred. Please try again.');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Ticket';
-        }
-    })
-    .catch(error => {
-        // Handle network errors
-        console.error('Error:', error);
-        alert('Could not connect to the server. Please try again.');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Ticket';
-    });
-});
-        // JavaScript code goes here
-    </script>
-</body>
     <!-- Main Container for the Form -->
     <div class="w-full max-w-2xl bg-white p-8 md:p-10 rounded-3xl custom-shadow transform transition-all duration-300 hover:scale-[1.01] border border-gray-200">
         <!-- Header Section -->
@@ -129,7 +99,8 @@ ticketForm.addEventListener('submit', function(event) {
         </div>
 
         <!-- Form for Ticket Submission -->
-        <form action="/submit_ticket" method="POST" class="space-y-6">
+        <!-- Removed action and method attributes, will handle submission with JS fetch -->
+        <form id="ticketForm" class="space-y-6">
 
             <!-- Submitter Name -->
             <div>
@@ -147,26 +118,19 @@ ticketForm.addEventListener('submit', function(event) {
                        placeholder="e.g., jane.doe@example.com" required>
             </div>
 
-            <!-- Office -->
+            <!-- Department -->
             <div>
-                <label for="office" class="block text-gray-800 text-base font-semibold mb-2">Office</label>
-                <select id="office" name="office"
+                <label for="department" class="block text-gray-800 text-base font-semibold mb-2">Department</label>
+                <select id="department" name="department"
                         class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white appearance-none focus:border-indigo-500 transition duration-200 ease-in-out"
                         required>
-                    <option value="">Select your Office</option>
+                    <option value="">Select your department</option>
                     <option value="IT">IT</option>
                     <option value="HR">Human Resources</option>
-                    <option value="EIB">EIB</option>
-                    <option value="Registry">Registry</option>
-                    <option value="Accounts">Accounts</option>
-                    <option value="Child Labour">Child Labour</option>
-                    <option value="Employment and Migration">Employment and Migration</option>
-                    <option value="Industrial Relations">Industrial Relations</option>
-                    <option value="Legal">Legal</option>
-                    <option value="Planning and Monitoring">Planning and Monitoring</option>
-                    <option value="Procurement">Procurement</option>
-                    <option value="Client Service">Client Service</option>
-                    <option value="CLO">CLO</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Operations">Operations</option>
+                    <option value="Other">Other</option>
                 </select>
             </div>
 
@@ -201,9 +165,13 @@ ticketForm.addEventListener('submit', function(event) {
             </div>
 
             <!-- Submit Button -->
-            <button type="submit"
-                    class="w-full bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-purple-300">
-                Submit Ticket
+            <button type="submit" id="submitButton"
+                    class="w-full bg-gradient-to-r from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-purple-300 flex items-center justify-center">
+                <span id="buttonText">Submit Ticket</span>
+                <svg id="loadingSpinner" class="animate-spin h-5 w-5 text-white ml-3 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
             </button>
         </form>
     </div>
@@ -212,17 +180,99 @@ ticketForm.addEventListener('submit', function(event) {
     <footer class="mt-8 text-gray-600 text-sm text-center">
         <p>&copy; 2025 IT Support. All rights reserved.</p>
     </footer>
-<!-- In new_ticket.html, place this where you want messages to appear -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    <div class="w-full max-w-2xl mx-auto mt-4">
-      {% for category, message in messages %}
-        <div class="p-3 mb-3 rounded-lg text-white {% if category == 'success' %}bg-green-500{% else %}bg-red-500{% endif %}">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-{% endwith %}
+
+    <script>
+        // Function to display a flash message
+        function displayFlashMessage(message, category) {
+            const container = document.getElementById('flash-message-container');
+            const messageDiv = document.createElement('div');
+            const uniqueId = 'flash-message-' + Date.now(); // Ensure unique ID
+            messageDiv.id = uniqueId;
+            messageDiv.className = `p-4 rounded-lg text-lg font-semibold flex items-center justify-between animate-slide-in-fade-in shadow-lg ${category === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`;
+            messageDiv.innerHTML = `
+                <span>
+                    ${category === 'success' ? '✨ Success!' : '⚠️ Error!'} ${message}
+                </span>
+                <button onclick="this.closest('.p-4').classList.add('animate-fade-out'); setTimeout(() => this.closest('.p-4').remove(), 500);"
+                        class="ml-4 text-white hover:text-gray-100 focus:outline-none">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            `;
+            container.prepend(messageDiv); // Add to the top
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageDiv.classList.add('animate-fade-out');
+                messageDiv.addEventListener('animationend', () => {
+                    messageDiv.remove();
+                }, { once: true });
+            }, 5000);
+        }
+
+        // Handle form submission via Fetch API
+        document.getElementById('ticketForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            const submitButton = document.getElementById('submitButton');
+            const buttonText = document.getElementById('buttonText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+
+            // Show loading state
+            submitButton.disabled = true;
+            buttonText.textContent = 'Submitting...';
+            loadingSpinner.classList.remove('hidden');
+
+            const formData = new FormData(this); // Get form data
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+
+            try {
+                const response = await fetch('/submit_ticket', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json', // Explicitly send as JSON
+                    },
+                    body: JSON.stringify(data) // Convert data to JSON string
+                });
+
+                // Flask's flash messages are handled by redirect, but with fetch, we get a direct response.
+                // We'll check the status and display our own client-side flash message.
+                if (response.ok) { // Status 200-299
+                    // If Flask redirects, response.ok will still be true for 302.
+                    // We need to read the response text to see if it's a flash message or a redirect.
+                    // For simplicity, we'll assume a successful fetch means the ticket was processed.
+                    displayFlashMessage('Your ticket has been submitted successfully!', 'success');
+                    this.reset(); // Clear the form on success
+                } else {
+                    const errorData = await response.json(); // Assuming Flask sends JSON errors
+                    displayFlashMessage(errorData.message || 'An unexpected error occurred.', 'error');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                displayFlashMessage('Network error or server unreachable. Please try again.', 'error');
+            } finally {
+                // Hide loading state
+                submitButton.disabled = false;
+                buttonText.textContent = 'Submit Ticket';
+                loadingSpinner.classList.add('hidden');
+            }
+        });
+
+        // Auto-hide existing flash messages (from server-side flashes if any)
+        document.addEventListener('DOMContentLoaded', function() {
+            const serverFlashMessages = document.querySelectorAll('[id^="flash-message-"]');
+            serverFlashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.classList.add('animate-fade-out');
+                    message.addEventListener('animationend', () => {
+                        message.remove();
+                    }, { once: true });
+                }, 5000);
+            });
+        });
+    </script>
+
 </body>
 </html>

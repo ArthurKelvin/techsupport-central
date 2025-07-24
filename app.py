@@ -1,25 +1,22 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from datetime import datetime # Import datetime for explicit timestamp handling if needed
+from datetime import datetime
 
 app = Flask(__name__)
 
 # --- DATABASE CONFIGURATION ---
-# Get the database URL from the environment variable.
-# If it's not set, default to a local SQLite database.
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///tickets.db')
-# This replaces the postgres:// protocol with postgresql:// which SQLAlchemy needs.
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False # Optional: to suppress a warning
-app.config['SECRET_KEY'] = 'your_super_secret_key_here' # Add a secret key for flash messages
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'a_very_secret_and_random_key_for_flash_messages')
 
 db = SQLAlchemy(app)
-migrate = Migrate(app, db) # Initialize Flask-Migrate
+migrate = Migrate(app, db)
 
 # --- DATABASE MODEL ---
 class Ticket(db.Model):
@@ -41,7 +38,6 @@ class Ticket(db.Model):
 # --- Homepage Route ---
 @app.route('/')
 def index():
-    # Redirect users from the homepage to the new ticket form
     return redirect(url_for('new_ticket_route'))
 
 # --- New Ticket Form Route ---
@@ -49,65 +45,73 @@ def index():
 def new_ticket_route():
     return render_template('new_ticket.html')
 
-# --- New Ticket Submission Route ---
-# This route handles the POST request from the new_ticket.html form
+# --- New Ticket Submission Route (Now expecting JSON) ---
 @app.route('/submit_ticket', methods=['POST'])
 def submit_ticket():
-    if request.method == 'POST':
-        try:
-            # Get data from the form using request.form
-            submitter_name = request.form['submitter_name']
-            submitter_email = request.form['submitter_email']
-            department = request.form['department']
-            issue_title = request.form['issue_title']
-            description = request.form['description']
-            urgency = request.form['urgency']
+    # Attempt to get JSON data from the request body
+    data = request.get_json()
 
-            # Create a new Ticket instance
-            new_ticket = Ticket(
-                submitter_name=submitter_name,
-                submitter_email=submitter_email,
-                department=department,
-                issue_title=issue_title,
-                description=description,
-                urgency=urgency,
-                status='Open' # Default status for new tickets
-            )
+    # --- DEBUGGING STEP: Print the raw JSON data received by Flask ---
+    print("--- Received JSON Data ---")
+    print(data)
+    print("--------------------------")
 
-            # Add the new ticket to the database session
-            db.session.add(new_ticket)
-            # Commit the transaction to save the ticket to the database
-            db.session.commit()
+    if not data:
+        print("No JSON data received.")
+        return jsonify({"message": "Invalid JSON or no data provided"}), 400
 
-            # Use flash messages to give feedback to the user
-            flash('Your ticket has been submitted successfully!', 'success')
+    try:
+        # Access data using dictionary keys
+        submitter_name = data.get('submitter_name')
+        submitter_email = data.get('submitter_email')
+        department = data.get('department')
+        issue_title = data.get('issue_title')
+        description = data.get('description')
+        urgency = data.get('urgency')
 
-            # Redirect to a confirmation page or back to the new ticket form
-            # For now, redirecting back to the new ticket form, which will show the flash message
-            return redirect(url_for('new_ticket_route'))
+        # Basic validation for required fields
+        if not submitter_name or not submitter_email or not issue_title or not description or not urgency:
+            missing_fields = []
+            if not submitter_name: missing_fields.append('submitter_name')
+            if not submitter_email: missing_fields.append('submitter_email')
+            if not issue_title: missing_fields.append('issue_title')
+            if not description: missing_fields.append('description')
+            if not urgency: missing_fields.append('urgency')
 
-        except Exception as e:
-            # Rollback the session in case of an error to prevent inconsistent state
-            db.session.rollback()
-            # Log the error for debugging purposes
-            print(f"Error submitting ticket: {e}")
-            # Flash an error message to the user
-            flash(f'An error occurred: {e}', 'error')
-            # Redirect back to the form to allow resubmission or display error
-            return redirect(url_for('new_ticket_route'))
+            error_message = f'Missing required fields: {", ".join(missing_fields)}.'
+            print(error_message) # Log to server console
+            return jsonify({"message": error_message}), 400
 
-# --- Example Route for Listing Tickets (You'll expand on this later) ---
+        new_ticket = Ticket(
+            submitter_name=submitter_name,
+            submitter_email=submitter_email,
+            department=department,
+            issue_title=issue_title,
+            description=description,
+            urgency=urgency,
+            status='Open'
+        )
+
+        db.session.add(new_ticket)
+        db.session.commit()
+
+        # Return a JSON success response
+        return jsonify({"message": "Ticket submitted successfully!"}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"An unexpected error occurred during ticket submission: {e}")
+        # Return a JSON error response
+        return jsonify({"message": f"Server error: {e}"}), 500
+
+# --- Example Route for Listing Tickets ---
 @app.route('/tickets')
 def list_tickets():
-    # Fetch all tickets from the database
-    # For a real app, you'd add filtering, pagination, etc.
     tickets = Ticket.query.all()
-    return render_template('tickets.html', tickets=tickets) # You'll need to create tickets.html
+    return render_template('tickets.html', tickets=tickets)
 
 # --- Main entry point for running the Flask app ---
 if __name__ == '__main__':
-    # This block is for local development.
-    # On Render, your web server (like Gunicorn) will handle running the app.
     with app.app_context():
-        db.create_all() # Create database tables if they don't exist
-    app.run(debug=True) # Run in debug mode for development
+        db.create_all()
+    app.run(debug=True)
