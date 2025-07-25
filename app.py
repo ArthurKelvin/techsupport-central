@@ -48,10 +48,8 @@ def new_ticket_route():
 # --- New Ticket Submission Route (Now expecting JSON) ---
 @app.route('/submit_ticket', methods=['POST'])
 def submit_ticket():
-    # Attempt to get JSON data from the request body
     data = request.get_json()
 
-    # --- DEBUGGING STEP: Print the raw JSON data received by Flask ---
     print("--- Received JSON Data ---")
     print(data)
     print("--------------------------")
@@ -61,7 +59,6 @@ def submit_ticket():
         return jsonify({"message": "Invalid JSON or no data provided"}), 400
 
     try:
-        # Access data using dictionary keys
         submitter_name = data.get('submitter_name')
         submitter_email = data.get('submitter_email')
         department = data.get('department')
@@ -69,7 +66,6 @@ def submit_ticket():
         description = data.get('description')
         urgency = data.get('urgency')
 
-        # Basic validation for required fields
         if not submitter_name or not submitter_email or not issue_title or not description or not urgency:
             missing_fields = []
             if not submitter_name: missing_fields.append('submitter_name')
@@ -79,7 +75,7 @@ def submit_ticket():
             if not urgency: missing_fields.append('urgency')
 
             error_message = f'Missing required fields: {", ".join(missing_fields)}.'
-            print(error_message) # Log to server console
+            print(error_message)
             return jsonify({"message": error_message}), 400
 
         new_ticket = Ticket(
@@ -95,13 +91,11 @@ def submit_ticket():
         db.session.add(new_ticket)
         db.session.commit()
 
-        # Return a JSON success response
         return jsonify({"message": "Ticket submitted successfully!"}), 200
 
     except Exception as e:
         db.session.rollback()
         print(f"An unexpected error occurred during ticket submission: {e}")
-        # Return a JSON error response
         return jsonify({"message": f"Server error: {e}"}), 500
 
 # --- Example Route for Listing Tickets ---
@@ -112,6 +106,9 @@ def list_tickets():
 
 # --- Main entry point for running the Flask app ---
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    # This block is for local development.
+    # On Render, your web server (like Gunicorn) will handle running the app,
+    # and migrations (flask db upgrade) will handle table creation.
+    with app.app_context(): # This will now only run when app.py is executed directly
+        db.create_all() # Good for initial local setup if not using migrations yet
     app.run(debug=True)
